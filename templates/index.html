@@ -22,6 +22,8 @@
       <header class="topbar">
         <div><p class="eyebrow">PERSONAL AI WORKSPACE</p><h1>What can I help you create?</h1></div>
         <span class="connection" id="connection"><i></i> Ready</span>
+        <button class="mobile-library-btn" id="mobileLibraryButton" type="button">▣</button>
+        <div class="mobile-account" id="mobileAccountArea"></div>
       </header>
 
       <section class="mode-grid" aria-label="Assistant modes">
@@ -82,10 +84,18 @@ function setBusy(busy) {
 }
 function showModal(id) { document.getElementById(id).hidden = false; }
 function closeModal(id) { document.getElementById(id).hidden = true; }
+async function doLogout() {
+  await fetch('/api/auth/logout', {method: 'POST'});
+  state.user = null; state.messages = []; state.chatId = null;
+  renderAccount(); renderHistory(); $('#newChat').click();
+}
 function renderAccount() {
   $('#accountArea').innerHTML = state.user ? `<span class="user-email">${escapeHtml(state.user.email)}</span><button class="auth-button" id="logout" type="button">Sign out</button>` : '<button class="auth-button" id="openAuth" type="button">Sign in</button>';
+  $('#mobileAccountArea').innerHTML = state.user ? '<button class="auth-button" id="logoutMobile" type="button">Sign out</button>' : '<button class="auth-button" id="openAuthMobile" type="button">Sign in</button>';
   $('#openAuth')?.addEventListener('click', () => showModal('authModal'));
-  $('#logout')?.addEventListener('click', async () => { await fetch('/api/auth/logout', {method: 'POST'}); state.user = null; state.messages = []; state.chatId = null; renderAccount(); renderHistory(); $('#newChat').click(); });
+  $('#logout')?.addEventListener('click', doLogout);
+  $('#openAuthMobile')?.addEventListener('click', () => showModal('authModal'));
+  $('#logoutMobile')?.addEventListener('click', doLogout);
 }
 async function loadDocuments() {
   if (!state.user) return;
@@ -115,6 +125,7 @@ $('#suggestions').onclick = event => { if (event.target.tagName === 'BUTTON') { 
 $('#newChat').onclick = () => { state.messages = []; state.chatId = null; $('#conversation').innerHTML = '<div class="empty-state" id="emptyState"><div class="empty-icon">✦</div><h2>Start a focused conversation</h2><p>Choose a mode above, or try one of these prompts.</p></div>'; $('#question').focus(); };
 $('#clearHistory').onclick = async () => { if (!state.user || !confirm('Delete all chats in your account?')) return; await fetch('/api/chats', {method: 'DELETE'}); state.messages = []; state.chatId = null; $('#newChat').click(); renderHistory(); };
 $('#libraryButton').onclick = () => { if (!state.user) return showModal('authModal'); loadDocuments(); showModal('libraryModal'); };
+$('#mobileLibraryButton').onclick = () => { if (!state.user) return showModal('authModal'); loadDocuments(); showModal('libraryModal'); };
 document.querySelectorAll('[data-close]').forEach(button => button.onclick = () => closeModal(button.dataset.close));
 $('#switchAuth').onclick = () => { state.isSignup = !state.isSignup; $('#authTitle').textContent = state.isSignup ? 'Create your account' : 'Welcome back'; $('#authCopy').textContent = state.isSignup ? 'Create a private workspace for your chats and documents.' : 'Sign in to chat and use your private knowledge library.'; $('#authForm button').textContent = state.isSignup ? 'Create account' : 'Sign in'; $('#switchAuth').textContent = state.isSignup ? 'Already have an account? Sign in' : 'New here? Create an account'; $('#authError').textContent = ''; };
 $('#authForm').onsubmit = async event => {
