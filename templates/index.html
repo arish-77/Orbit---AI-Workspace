@@ -1,90 +1,143 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Personal Assistant</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Orbit — AI Workspace</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <h1 class="main-heading">AI Personal Assistant</h1>
+  <main class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="/"><span class="brand-mark">✦</span> Orbit</a>
+      <button class="new-chat" id="newChat" type="button">＋ New conversation</button>
+      <button class="library-button" id="libraryButton" type="button">▣ My knowledge</button>
+      <div class="history-heading"><span>RECENT</span><button id="clearHistory" type="button" title="Clear saved history">Clear</button></div>
+      <div class="history-list" id="historyList" aria-label="Saved conversations"></div>
+      <div class="account-area" id="accountArea"><button class="auth-button" id="openAuth" type="button">Sign in</button></div>
+      <p class="privacy-note">Your conversation list is saved only in this browser.</p>
+    </aside>
 
-    <div class="container">
-        <h2>Choose Mode</h2>
-    
-        <div class="mode-bar">
-            <button type="button" class="mode-btn active" data-mode="chat">💬 Chat</button>
-            <button type="button" class="mode-btn" data-mode="summarize">📧 Summarize</button>
-            <button type="button" class="mode-btn" data-mode="code">🧠 Code</button>
-            <button type="button" class="mode-btn" data-mode="rewrite">✍️ Rewrite</button>
-        </div>
-    
-        <h2>Ask Anything</h2>
-        <form id="askForm">
-            <input type="text" name="question" placeholder="Ask anything..." required>
-            <button type="submit">Ask</button>
-        </form>
+    <section class="workspace">
+      <header class="topbar">
+        <div><p class="eyebrow">PERSONAL AI WORKSPACE</p><h1>What can I help you create?</h1></div>
+        <span class="connection" id="connection"><i></i> Ready</span>
+      </header>
 
-        <!-- 🔥 ADD THESE -->
-        <p id="ans-loading" style="display:none;">Processing...</p>
-        <p id="answer"></p>
+      <section class="mode-grid" aria-label="Assistant modes">
+        <button class="mode-card active" type="button" data-mode="chat" data-placeholder="Ask anything…"><span>💬</span><strong>Chat</strong><small>Think through anything</small></button>
+        <button class="mode-card" type="button" data-mode="summarize" data-placeholder="Paste text you want summarized…"><span>▤</span><strong>Summarize</strong><small>Find what matters</small></button>
+        <button class="mode-card" type="button" data-mode="rewrite" data-placeholder="Paste text to improve…"><span>✎</span><strong>Rewrite</strong><small>Make it sharper</small></button>
+        <button class="mode-card" type="button" data-mode="email" data-placeholder="Describe the email you need…"><span>✉</span><strong>Email</strong><small>Draft with confidence</small></button>
+        <button class="mode-card" type="button" data-mode="code" data-placeholder="Paste code or describe a coding problem…"><span>⌘</span><strong>Code</strong><small>Debug and learn</small></button>
+        <button class="mode-card" type="button" data-mode="ideas" data-placeholder="What would you like to brainstorm?"><span>✦</span><strong>Ideas</strong><small>Explore possibilities</small></button>
+      </section>
+
+      <section class="conversation" id="conversation" aria-live="polite">
+        <div class="empty-state" id="emptyState"><div class="empty-icon">✦</div><h2>Start a focused conversation</h2><p>Choose a mode above, or try one of these prompts.</p></div>
+      </section>
+
+      <div class="suggestions" id="suggestions">
+        <button type="button">Plan a productive week</button>
+        <button type="button">Turn these notes into an email</button>
+        <button type="button">Explain a concept simply</button>
+      </div>
+
+      <form id="askForm" class="composer">
+        <textarea id="question" name="question" rows="1" placeholder="Ask anything…" required></textarea>
+        <div class="composer-footer"><label class="rag-toggle"><input id="useDocuments" type="checkbox" checked> Search my documents</label><span><kbd>Enter</kbd> to send · <kbd>Shift + Enter</kbd> for a new line</span><button id="sendButton" type="submit">Send <span>↑</span></button></div>
+      </form>
+    </section>
+  </main>
+
+  <div class="modal" id="authModal" hidden><section class="modal-card"><button class="close-modal" data-close="authModal" type="button">×</button><p class="eyebrow">YOUR ORBIT ACCOUNT</p><h2 id="authTitle">Welcome back</h2><p class="modal-copy" id="authCopy">Sign in to chat and use your private knowledge library.</p><form id="authForm"><input id="authEmail" type="email" placeholder="Email address" required><input id="authPassword" type="password" placeholder="Password" minlength="8" required><p class="form-error" id="authError"></p><button class="primary-action" type="submit">Sign in</button></form><button class="text-action" id="switchAuth" type="button">New here? Create an account</button></section></div>
+  <div class="modal" id="libraryModal" hidden><section class="modal-card library-card"><button class="close-modal" data-close="libraryModal" type="button">×</button><p class="eyebrow">RETRIEVAL LIBRARY</p><h2>My knowledge</h2><p class="modal-copy">Upload a document, then keep “Search my documents” on to ground answers in it.</p><form id="uploadForm" class="upload-form"><input id="documentFile" type="file" accept=".txt,.md,.csv,.json,.pdf" required><button class="primary-action" type="submit">Upload document</button></form><p class="form-error" id="uploadError"></p><div class="document-list" id="documentList"></div></section></div>
 
 <script>
-document.addEventListener("DOMContentLoaded", () => {
+const state = { mode: 'chat', messages: [], chatId: null, chats: [], user: null, isSignup: false };
+const $ = (selector) => document.querySelector(selector);
+const escapeHtml = (text) => text.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char]));
 
-    let selectedMode = "chat";
+async function renderHistory() {
+  if (!state.user) { $('#historyList').innerHTML = '<p class="no-history">Sign in to see your chats</p>'; return; }
+  const result = await fetch('/api/chats').then(r => r.json()); state.chats = result.chats || [];
+  $('#historyList').innerHTML = state.chats.map(chat => `<button type="button" data-chat="${chat.id}">${escapeHtml(chat.title)}</button>`).join('') || '<p class="no-history">No saved conversations</p>';
+  document.querySelectorAll('[data-chat]').forEach(button => button.onclick = async () => {
+    const chat = await fetch(`/api/chats/${button.dataset.chat}`).then(r => r.json()); state.chatId = chat.id; state.messages = chat.messages; renderMessages();
+  });
+}
+function renderMessages() {
+  $('#emptyState')?.remove();
+  $('#conversation').innerHTML = state.messages.map(m => `<article class="message ${m.role}"><div class="avatar">${m.role === 'user' ? 'You' : '✦'}</div><div class="bubble">${escapeHtml(m.content).replace(/\n/g, '<br>')}${m.role === 'assistant' ? '<button class="copy-btn" type="button">Copy</button>' : ''}</div></article>`).join('');
+  document.querySelectorAll('.copy-btn').forEach((button, i) => button.onclick = async () => { await navigator.clipboard.writeText(state.messages.filter(m => m.role === 'assistant')[i].content); button.textContent = 'Copied'; });
+  $('#conversation').scrollTop = $('#conversation').scrollHeight;
+}
+function showTyping() {
+  $('#conversation').insertAdjacentHTML('beforeend', '<article class="message assistant" id="typingIndicator"><div class="avatar">✦</div><div class="bubble typing-bubble"><span class="typing-dots"><span></span><span></span><span></span></span></div></article>');
+  $('#conversation').scrollTop = $('#conversation').scrollHeight;
+}
+function setBusy(busy) {
+  $('#sendButton').disabled = busy; $('#sendButton').innerHTML = busy ? 'Thinking…' : 'Send <span>↑</span>';
+  $('#connection').innerHTML = busy ? '<i class="thinking"></i> Thinking' : '<i></i> Ready';
+}
+function showModal(id) { document.getElementById(id).hidden = false; }
+function closeModal(id) { document.getElementById(id).hidden = true; }
+function renderAccount() {
+  $('#accountArea').innerHTML = state.user ? `<span class="user-email">${escapeHtml(state.user.email)}</span><button class="auth-button" id="logout" type="button">Sign out</button>` : '<button class="auth-button" id="openAuth" type="button">Sign in</button>';
+  $('#openAuth')?.addEventListener('click', () => showModal('authModal'));
+  $('#logout')?.addEventListener('click', async () => { await fetch('/api/auth/logout', {method: 'POST'}); state.user = null; state.messages = []; state.chatId = null; renderAccount(); renderHistory(); $('#newChat').click(); });
+}
+async function loadDocuments() {
+  if (!state.user) return;
+  const result = await fetch('/api/documents').then(r => r.json());
+  $('#documentList').innerHTML = result.documents.length ? result.documents.map(d => `<div class="document-row"><span>📄 ${escapeHtml(d.filename)}</span><button data-delete="${d.id}" type="button">Remove</button></div>`).join('') : '<p class="no-history">No documents yet.</p>';
+  document.querySelectorAll('[data-delete]').forEach(button => button.onclick = async () => { await fetch(`/api/documents/${button.dataset.delete}`, {method: 'DELETE'}); loadDocuments(); });
+}
 
-    // Mode buttons
-    document.querySelectorAll(".mode-btn").forEach(btn => {
-        btn.addEventListener("click", () => {
-            document.querySelectorAll(".mode-btn").forEach(b => b.classList.remove("active"));
-            btn.classList.add("active");
-            selectedMode = btn.getAttribute("data-mode");
-        });
-    });
-
-    // Ask form
-    document.getElementById("askForm").onsubmit = async (e) => {
-        e.preventDefault();
-        let formData = new FormData(e.target);
-
-        formData.append("mode", selectedMode);
-
-        let loading = document.getElementById("ans-loading");
-        loading.style.display = "block";
-
-        let res = await fetch("/ask", {
-            method: "POST",
-            body: formData
-        });
-
-        let data = await res.json();
-        document.getElementById("answer").innerText = data.response;
-
-        loading.style.display = "none";
-    };
-
-    // Email form
-    document.getElementById("emailForm").onsubmit = async (e) => {
-        e.preventDefault();
-        let formData = new FormData(e.target);
-
-        let loading = document.getElementById("summary-loading");
-        loading.style.display = "block";
-
-        let res = await fetch("/summarize", {
-            method: "POST",
-            body: formData
-        });
-
-        let data = await res.json();
-        document.getElementById("summary").innerText = data.response;
-
-        loading.style.display = "none";
-    };
-
+document.querySelectorAll('.mode-card').forEach(card => card.onclick = () => {
+  document.querySelector('.mode-card.active').classList.remove('active'); card.classList.add('active');
+  state.mode = card.dataset.mode; $('#question').placeholder = card.dataset.placeholder; $('#question').focus();
 });
+$('#askForm').onsubmit = async (event) => {
+  event.preventDefault(); if (!state.user) { showModal('authModal'); return; } const input = $('#question'); const question = input.value.trim(); if (!question) return;
+  state.messages.push({role: 'user', content: question}); input.value = ''; input.style.height = 'auto'; renderMessages(); setBusy(true); showTyping();
+  try {
+    const data = new FormData(); data.append('question', question); data.append('mode', state.mode); data.append('history', JSON.stringify(state.messages.slice(0, -1))); data.append('use_documents', $('#useDocuments').checked); if (state.chatId) data.append('conversation_id', state.chatId);
+    const response = await fetch('/ask', {method: 'POST', body: data}); const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Something went wrong.');
+    state.messages.push({role: 'assistant', content: result.response + (result.sources?.length ? `\n\nSources: ${result.sources.join(', ')}` : '')}); state.chatId = result.chat_id; renderHistory();
+  } catch (error) { state.messages.push({role: 'assistant', content: `Sorry — ${error.message}`}); }
+  finally { renderMessages(); setBusy(false); }
+};
+$('#question').oninput = event => { event.target.style.height = 'auto'; event.target.style.height = Math.min(event.target.scrollHeight, 160) + 'px'; };
+$('#question').onkeydown = event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); $('#askForm').requestSubmit(); } };
+$('#suggestions').onclick = event => { if (event.target.tagName === 'BUTTON') { $('#question').value = event.target.textContent; $('#question').focus(); } };
+$('#newChat').onclick = () => { state.messages = []; state.chatId = null; $('#conversation').innerHTML = '<div class="empty-state" id="emptyState"><div class="empty-icon">✦</div><h2>Start a focused conversation</h2><p>Choose a mode above, or try one of these prompts.</p></div>'; $('#question').focus(); };
+$('#clearHistory').onclick = async () => { if (!state.user || !confirm('Delete all chats in your account?')) return; await fetch('/api/chats', {method: 'DELETE'}); state.messages = []; state.chatId = null; $('#newChat').click(); renderHistory(); };
+$('#libraryButton').onclick = () => { if (!state.user) return showModal('authModal'); loadDocuments(); showModal('libraryModal'); };
+document.querySelectorAll('[data-close]').forEach(button => button.onclick = () => closeModal(button.dataset.close));
+$('#switchAuth').onclick = () => { state.isSignup = !state.isSignup; $('#authTitle').textContent = state.isSignup ? 'Create your account' : 'Welcome back'; $('#authCopy').textContent = state.isSignup ? 'Create a private workspace for your chats and documents.' : 'Sign in to chat and use your private knowledge library.'; $('#authForm button').textContent = state.isSignup ? 'Create account' : 'Sign in'; $('#switchAuth').textContent = state.isSignup ? 'Already have an account? Sign in' : 'New here? Create an account'; $('#authError').textContent = ''; };
+$('#authForm').onsubmit = async event => {
+  event.preventDefault();
+  const submitBtn = $('#authForm button[type="submit"]');
+  if (submitBtn.disabled) return;
+  const originalLabel = submitBtn.textContent;
+  submitBtn.disabled = true; submitBtn.textContent = state.isSignup ? 'Creating account…' : 'Signing in…'; $('#authError').textContent = '';
+  try {
+    const response = await fetch(state.isSignup ? '/api/auth/signup' : '/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({email: $('#authEmail').value, password: $('#authPassword').value})});
+    const result = await response.json();
+    if (!response.ok) { $('#authError').textContent = result.error; return; }
+    if (result.confirmation_required) { $('#authError').textContent = `We sent a confirmation link to ${result.email}. Confirm it, then sign in.`; return; }
+    state.user = result; renderAccount(); renderHistory(); closeModal('authModal'); $('#authForm').reset(); $('#question').focus();
+  } catch (error) {
+    $('#authError').textContent = 'Something went wrong. Please try again.';
+  } finally {
+    submitBtn.disabled = false; submitBtn.textContent = originalLabel;
+  }
+};
+$('#uploadForm').onsubmit = async event => { event.preventDefault(); const data = new FormData(); data.append('file', $('#documentFile').files[0]); const response = await fetch('/api/documents', {method: 'POST', body: data}); const result = await response.json(); if (!response.ok) return $('#uploadError').textContent = result.error; $('#uploadError').textContent = `Uploaded ${result.filename} — ${result.chunks} searchable sections.`; $('#uploadForm').reset(); loadDocuments(); };
+fetch('/api/me').then(r => r.json()).then(user => { state.user = user.authenticated ? user : null; renderAccount(); renderHistory(); });
+renderHistory();
 </script>
-
 </body>
 </html>
