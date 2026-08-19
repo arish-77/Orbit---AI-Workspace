@@ -19,7 +19,7 @@ A full-stack, multi-mode AI assistant with document-grounded answers (RAG), user
 
 ## Screenshot
 
-[Orbit screenshot](docs/Screenshot.png)
+![Orbit screenshot](docs/Screenshot.png)
 
 ---
 
