@@ -11,7 +11,6 @@
     <aside class="sidebar">
       <a class="brand" href="/"><span class="brand-mark">✦</span> Orbit</a>
       <button class="new-chat" id="newChat" type="button">＋ New conversation</button>
-      <button class="library-button" id="libraryButton" type="button">▣ My knowledge</button>
       <div class="history-heading"><span>RECENT</span><button id="clearHistory" type="button" title="Clear saved history">Clear</button></div>
       <div class="history-list" id="historyList" aria-label="Saved conversations"></div>
       <div class="account-area" id="accountArea"><button class="auth-button" id="openAuth" type="button">Sign in</button></div>
@@ -22,7 +21,6 @@
       <header class="topbar">
         <div><p class="eyebrow">PERSONAL AI WORKSPACE</p><h1>What can I help you create?</h1></div>
         <span class="connection" id="connection"><i></i> Ready</span>
-        <button class="mobile-library-btn" id="mobileLibraryButton" type="button">▣</button>
         <div class="mobile-account" id="mobileAccountArea"></div>
       </header>
 
@@ -46,7 +44,10 @@
       </div>
 
       <form id="askForm" class="composer">
-        <textarea id="question" name="question" rows="1" placeholder="Ask anything…" required></textarea>
+        <div class="composer-top">
+          <button class="attach-button" id="attachButton" type="button" title="Manage documents">+</button>
+          <textarea id="question" name="question" rows="1" placeholder="Ask anything…" required></textarea>
+        </div>
         <div class="composer-footer"><label class="rag-toggle"><input id="useDocuments" type="checkbox" checked> Search my documents</label><span><kbd>Enter</kbd> to send · <kbd>Shift + Enter</kbd> for a new line</span><button id="sendButton" type="submit">Send <span>↑</span></button></div>
       </form>
     </section>
@@ -124,8 +125,7 @@ $('#question').onkeydown = event => { if (event.key === 'Enter' && !event.shiftK
 $('#suggestions').onclick = event => { if (event.target.tagName === 'BUTTON') { $('#question').value = event.target.textContent; $('#question').focus(); } };
 $('#newChat').onclick = () => { state.messages = []; state.chatId = null; $('#conversation').innerHTML = '<div class="empty-state" id="emptyState"><div class="empty-icon">✦</div><h2>Start a focused conversation</h2><p>Choose a mode above, or try one of these prompts.</p></div>'; $('#question').focus(); };
 $('#clearHistory').onclick = async () => { if (!state.user || !confirm('Delete all chats in your account?')) return; await fetch('/api/chats', {method: 'DELETE'}); state.messages = []; state.chatId = null; $('#newChat').click(); renderHistory(); };
-$('#libraryButton').onclick = () => { if (!state.user) return showModal('authModal'); loadDocuments(); showModal('libraryModal'); };
-$('#mobileLibraryButton').onclick = () => { if (!state.user) return showModal('authModal'); loadDocuments(); showModal('libraryModal'); };
+$('#attachButton').onclick = () => { if (!state.user) return showModal('authModal'); loadDocuments(); showModal('libraryModal'); };
 document.querySelectorAll('[data-close]').forEach(button => button.onclick = () => closeModal(button.dataset.close));
 $('#switchAuth').onclick = () => { state.isSignup = !state.isSignup; $('#authTitle').textContent = state.isSignup ? 'Create your account' : 'Welcome back'; $('#authCopy').textContent = state.isSignup ? 'Create a private workspace for your chats and documents.' : 'Sign in to chat and use your private knowledge library.'; $('#authForm button').textContent = state.isSignup ? 'Create account' : 'Sign in'; $('#switchAuth').textContent = state.isSignup ? 'Already have an account? Sign in' : 'New here? Create an account'; $('#authError').textContent = ''; };
 $('#authForm').onsubmit = async event => {
